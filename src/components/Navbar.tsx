@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { MdMyLocation, MdOutlineLocationOn, MdWbSunny } from 'react-icons/md';
 import SearchBox from './SearchBox';
 import axios from 'axios';
-import { placeAtom } from '@/app/atom';
+import { loadingCityAtom, placeAtom } from '@/app/atom';
 import { useAtom } from 'jotai';
 
 const API_KEY = process.env.NEXT_PUBLIC_WEATHER_KEY;
@@ -17,6 +17,7 @@ export default function Navbar({ location }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [place, setPlace] = useAtom(placeAtom);
+  const [loading, setLoading] = useAtom(loadingCityAtom);
 
   const handleInputChange = async (value: string) => {
     setCity(value);
@@ -28,7 +29,7 @@ export default function Navbar({ location }: Props) {
         );
 
         const suggestion = response.data.list.map((item: any) => item.name);
-        setShowSuggestions(suggestion);
+        setSuggestions(suggestion);
         setError('');
         setShowSuggestions(true);
       } catch (error) {
@@ -47,13 +48,18 @@ export default function Navbar({ location }: Props) {
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    setLoading(true);
     e.preventDefault();
-    if (suggestions.length == 0) {
+    if (suggestions.length === 0) {
       setError('Location not found');
+      setLoading(false);
     } else {
       setError('');
-      setPlace(city);
-      setShowSuggestions(false);
+      setTimeout(() => {
+        setLoading(false);
+        setPlace(city);
+        setShowSuggestions(false);
+      }, 500);
     }
   };
 
@@ -63,53 +69,76 @@ export default function Navbar({ location }: Props) {
         const { latitude, longitude } = postion.coords;
 
         try {
+          setLoading(true);
           const response = await axios.get(
-            `api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${API_KEY}`
+            `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${API_KEY}`
           );
 
           setTimeout(() => {
+            setLoading(false);
             setPlace(response.data.name);
           }, 500);
-        } catch (error) {}
+        } catch (error) {
+          setLoading(false);
+        }
       });
     }
   };
   return (
-    <nav className='shadow-sm sticky top-0 left-0 bg-white'>
-      <div className='h-[80px] flex items-center justify-between max-w-7xl px-3 mx-auto'>
-        <p className='flex items-center justify-center gap-2'>
-          <h2 className='text-gray-500 text-3xl'>Weather</h2>
-          <MdWbSunny className='text-3xl mt-1 text-yellow-300' />
-        </p>
-        <section className='flex gap-2 items-center'>
-          <MdMyLocation
-            title='your current location'
-            onClick={handleCurrentLocation}
-            className='text-2xl text-gray-400 hover:opacity-80 cursor-pointer'
-          />
-          <MdOutlineLocationOn className='text-2xl' />
-          <p className='text-slate-900/80 text-sm'>{location}</p>
-          <div className='realative'>
-            <SearchBox
-              value={city}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onSubmit={handleSubmit}
-            />
-
-            <SuggestionBox
-              {...{
-                showSuggestions,
-                handleSuggestionClick,
-                suggestions,
-                error,
-              }}
-            />
+    <>
+      <nav className='shadow-sm sticky top-0 z-50 left-0 bg-white'>
+        <div className='h-[80px] flex items-center justify-between max-w-7xl px-3 mx-auto'>
+          <div className='flex items-center justify-center gap-2'>
+            <h2 className='text-gray-500 text-3xl'>Weather</h2>
+            <MdWbSunny className='text-3xl mt-1 text-yellow-300' />
           </div>
-        </section>
+          <section className='flex gap-2 items-center'>
+            <MdMyLocation
+              title='your current location'
+              onClick={handleCurrentLocation}
+              className='text-2xl text-gray-400 hover:opacity-80 cursor-pointer'
+            />
+            <MdOutlineLocationOn className='text-2xl' />
+            <p className='text-slate-900/80 text-sm'>{location}</p>
+            <div className='relative hidden md:flex'>
+              <SearchBox
+                value={city}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onSubmit={handleSubmit}
+              />
 
-        <section></section>
-      </div>
-    </nav>
+              <SuggestionBox
+                {...{
+                  showSuggestions,
+                  handleSuggestionClick,
+                  suggestions,
+                  error,
+                }}
+              />
+            </div>
+          </section>
+        </div>
+      </nav>
+
+      <section>
+        <div className='relative max-w-7xl px-3 md:hidden'>
+          <SearchBox
+            value={city}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onSubmit={handleSubmit}
+          />
+
+          <SuggestionBox
+            {...{
+              showSuggestions,
+              handleSuggestionClick,
+              suggestions,
+              error,
+            }}
+          />
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -135,7 +164,7 @@ const SuggestionBox = ({
             <li
               key={index}
               onClick={() => handleSuggestionClick(item)}
-              className='cursor-pointer p-1 rounded   hover:bg-gray-200'
+              className='cursor-pointer p-1 rounded hover:bg-gray-200'
             >
               {item}
             </li>
